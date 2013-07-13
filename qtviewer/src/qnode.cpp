@@ -25,6 +25,14 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 
+#include <drrobot_jaguarV2_player/MotorInfo.h>
+#include <drrobot_jaguarV2_player/MotorInfoArray.h>
+#include <drrobot_jaguarV2_player/RangeArray.h>
+#include <drrobot_jaguarV2_player/Range.h>
+#include <drrobot_jaguarV2_player/PowerInfo.h>
+#include <drrobot_jaguarV2_player/StandardSensor.h>
+#include <drrobot_jaguarV2_player/CustomSensor.h>
+#include <std_msgs/Header.h>
 
 
 /*****************************************************************************
@@ -40,7 +48,12 @@ namespace imu_gps {
 QNode::QNode(int argc, char** argv ) :
     init_argc(argc),
     init_argv(argv)
-    {}
+    {
+/*linearVel = 0;
+    angularVel = 0;
+    armVel = 0;*/
+
+}
 
 QNode::~QNode() {
     if(ros::isStarted()) {
@@ -74,6 +87,11 @@ bool QNode::init() {
     publisher_ptz_command = n.advertise<axis_camera::Axis>("/axis/cmd",1);
 
     subscriber_ptzStatus = n.subscribe("axis/state",1,&QNode::callback_PTZStatus,this);
+    
+    subscriber_motorSensorSub = n.subscribe("drrobot_motor", 1,&QNode::motorSensorCallback,this);
+    
+    velocityPublisher = n.advertise<geometry_msgs::Twist>("drrobot_player1/drrobot_cmd_vel",1);
+    
     start();
 
     return true;
@@ -128,6 +146,41 @@ void QNode::callback_frontCamera(const sensor_msgs::ImageConstPtr& msg)
 
 
 }
+    
+void QNode::motorSensorCallback(const drrobot_jaguarV2_player::MotorInfoArray::ConstPtr& msg)
+    {
+        int msgSize = msg->motorInfos.capacity();
+        
+        if (msgSize == 6)
+        {
+            ROS_INFO("Motor Encoder Pos: [%d, %d, %d, %d, %d, %d]", msg->motorInfos[0].encoder_pos, msg->motorInfos[1].encoder_pos, msg->motorInfos[2].encoder_pos
+                     , msg->motorInfos[3].encoder_pos, msg->motorInfos[4].encoder_pos, msg->motorInfos[5].encoder_pos);
+            ROS_INFO("Motor Encoder Vel: [%d, %d, %d, %d, %d, %d]", msg->motorInfos[0].encoder_vel, msg->motorInfos[1].encoder_vel, msg->motorInfos[2].encoder_vel
+                     , msg->motorInfos[3].encoder_vel, msg->motorInfos[4].encoder_vel, msg->motorInfos[5].encoder_vel);
+            ROS_INFO("Motor Encoder Dir: [%d, %d, %d, %d, %d, %d]", msg->motorInfos[0].encoder_dir, msg->motorInfos[1].encoder_dir, msg->motorInfos[2].encoder_dir
+                     , msg->motorInfos[3].encoder_dir, msg->motorInfos[4].encoder_dir, msg->motorInfos[5].encoder_dir);
+            ROS_INFO("Motor Motor Current: [%2.2f, %2.2f, %2.2f, %2.2f, %2.2f, %2.2f]", msg->motorInfos[0].motor_current, msg->motorInfos[1].motor_current, msg->motorInfos[2].motor_current
+                     , msg->motorInfos[3].motor_current, msg->motorInfos[4].motor_current, msg->motorInfos[5].motor_current);
+            ROS_INFO("Motor Motor_PWM: [%d, %d, %d, %d, %d, %d]", msg->motorInfos[0].motor_pwm, msg->motorInfos[1].motor_pwm, msg->motorInfos[2].motor_pwm
+                     , msg->motorInfos[3].motor_pwm, msg->motorInfos[4].motor_pwm, msg->motorInfos[5].motor_pwm);
+        }
+    
+}
+
+/*void QNode::sendVelocityCommand(float linearVel, float angularVel, float armVel)
+    {
+        velocityVector.linear.x = linearVel;
+        
+        this->velocityVector.angular.z = angularVel;
+        
+        this->velocityVector.linear.y = armVel;
+        
+        this->velocityPublisher.publish(velocityVector);
+        
+        
+    }
+    
+ */   
 void QNode::callback_PTZCamera(const sensor_msgs::ImageConstPtr& msg)
 {
 
@@ -241,6 +294,10 @@ bool QNode::init(const std::string &master_url, const std::string &host_url) {
             subscriber_extendedfix = n.subscribe("/extended_fix", 1000,&QNode::callback_gpsfix,this);
             subscriber_fix = n.subscribe("/fix", 1000,&QNode::callback_nawsatfix,this);
             subscriber_scan = n.subscribe<sensor_msgs::LaserScan>("/scan", 1000,&QNode::callback_scan,this);
+
+            subscriber_motorSensorSub = n.subscribe("drrobot_motor", 1,&QNode::motorSensorCallback,this);
+    
+            velocityPublisher = n.advertise<geometry_msgs::Twist>("drrobot_player1/drrobot_cmd_vel",1);
     }
     start();
 
@@ -249,8 +306,28 @@ bool QNode::init(const std::string &master_url, const std::string &host_url) {
 
 void QNode::run() {
 
-    ros::Rate loop(10);
-    ros::spin();
+  
+  
+
+  ros::Rate loop(10);
+
+	while(ros::ok())
+	{
+ 		
+
+		ros::spinOnce();
+
+		sendVelocityCommand(velocityVector.linear.x,velocityVector.angular.z,velocityVector.linear.y); 
+
+		loop.sleep();
+
+	}
+
+    
+    
+
+ velocityVector.linear.x = 0;
+    this->sendVelocityCommand(0,0,0);
 
    // ros::AsyncSpinner spinner_(4);
   //  spinner_.start();
@@ -259,12 +336,25 @@ void QNode::run() {
     Q_EMIT rosShutdown(); // used to signal the gui for a shutdown (useful to roslaunch)
 
 }
+
+void QNode::sendVelocityCommand(float linearVel, float angularVel, float armVel)
+{
+    velocityVector.linear.x = linearVel;
+
+    this->velocityVector.angular.z = angularVel;
+
+    this->velocityVector.linear.y = armVel;
+
+    this->velocityPublisher.publish(velocityVector);
+}
+
+
 void QNode::log( const LogLevel &level, const std::string &msg) {
     logging_model.insertRows(logging_model.rowCount(),1);
     std::stringstream logging_model_msg;
     switch ( level ) {
         case(Debug) : {
-                ROS_DEBUG_STREAM(msg);
+                ROS_DEBUG_STREAM(msg); 
                 logging_model_msg << "[DEBUG] [" << ros::Time::now() << "]: " << msg;
                 break;
         }

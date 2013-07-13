@@ -19,6 +19,8 @@
   <depend package="cv_bridge"/>
   <depend package="opencv2"/>
   <depend package="axis_camera"/>
+  <depend package="geometry_msgs"/>
+  <depend package="drrobot_jaguarV2_player"/>
 
 
   <rosdep name="libqt4-dev"/>

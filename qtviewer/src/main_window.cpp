@@ -286,6 +286,13 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent)
 
     QObject::connect(ui.buttonPTZTilt,SIGNAL(clicked()),this,SLOT(button_PTZTilt_clicked()));
 
+
+    QObject::connect(ui.buttonSendVelocity,SIGNAL(clicked()),this,SLOT(on_buttonSendVelocity_clicked()));
+    QObject::connect(ui.buttonSendVelocity_2,SIGNAL(clicked()),this,SLOT(on_buttonSendVelocity_2_clicked()));
+    QObject::connect(ui.buttonSendVelocity_3,SIGNAL(clicked()),this,SLOT(on_buttonSendVelocity_3_clicked()));
+    QObject::connect(ui.buttonSendVelocity_4,SIGNAL(clicked()),this,SLOT(on_buttonSendVelocity_4_clicked()));
+    
+
     /*********************
     ** Auto Start
     **********************/
@@ -432,6 +439,59 @@ void MainWindow::getPTZCameraStatus(axis_camera::Axis msg)
  * These triggers whenever the button is clicked, regardless of whether it
  * is already checked or not.
  */
+
+// bayram
+
+void MainWindow::on_buttonSendVelocity_clicked()
+{
+
+   float num = ui.lineEditVelX->text().toDouble();
+
+  // loop->linearVel = num;
+
+   qnode.sendVelocityCommand(num,0,0);
+
+}
+
+
+
+void MainWindow::on_buttonSendVelocity_2_clicked()
+{
+    float num = ui.lineEditVelX_2->text().toDouble();
+
+    //loop->angularVel = num;
+
+   qnode.sendVelocityCommand(0,num,0);
+
+}
+
+void MainWindow::on_buttonSendVelocity_3_clicked()
+{
+    float num = ui.lineEditVelX_3->text().toDouble();
+
+    qnode.sendVelocityCommand(0,0,num);
+}
+
+
+
+
+
+
+void MainWindow::on_buttonSendVelocity_4_clicked()
+{ 
+    
+
+	qnode.sendVelocityCommand(0,0,0);
+
+
+}
+
+
+
+
+
+//
+
 
 void MainWindow::on_button_connect_clicked(bool check ) {
 	if ( ui.checkbox_use_environment->isChecked() ) {

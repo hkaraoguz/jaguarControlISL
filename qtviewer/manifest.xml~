@@ -18,6 +18,9 @@
   <depend package="compressed_image_transport"/>
   <depend package="cv_bridge"/>
   <depend package="opencv2"/>
+  <depend package="axis_camera"/>
+  <depend package="geometry_msgs"/>
+  <depend package="drrobot_player"/>
 
 
   <rosdep name="libqt4-dev"/>

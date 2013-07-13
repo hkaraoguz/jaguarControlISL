@@ -184,7 +184,15 @@ public Q_SLOTS:
 	void on_actionAbout_triggered();
 	void on_button_connect_clicked(bool check );
 	void on_checkbox_use_environment_stateChanged(int state);
+        void on_buttonSendVelocity_clicked();
 
+     	void on_buttonSendVelocity_2_clicked();
+
+     	void on_buttonSendVelocity_3_clicked();
+
+
+
+     void on_buttonSendVelocity_4_clicked();
 
     /******************************************
     ** Manual connections

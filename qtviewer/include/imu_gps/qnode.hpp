@@ -39,6 +39,16 @@
 #include <axis_camera/Axis.h>
 
 
+#include <drrobot_jaguarV2_player/MotorInfo.h>
+#include <drrobot_jaguarV2_player/MotorInfoArray.h>
+#include <drrobot_jaguarV2_player/RangeArray.h>
+#include <drrobot_jaguarV2_player/Range.h>
+#include <drrobot_jaguarV2_player/PowerInfo.h>
+#include <drrobot_jaguarV2_player/StandardSensor.h>
+#include <drrobot_jaguarV2_player/CustomSensor.h>
+#include <std_msgs/Header.h>
+
+
 /*****************************************************************************
 ** Namespaces
 *****************************************************************************/
@@ -74,6 +84,8 @@ public:
 
     ros::Publisher publisher_ptz_command;
 
+    void sendVelocityCommand(float linearVel, float angularVel, float armVel);
+
 Q_SIGNALS:
 
 	void loggingUpdated();
@@ -107,17 +119,24 @@ Q_SIGNALS:
     void frontCamera_signal(cv::Mat);
     void ptzCamera_signal(cv::Mat);
     void ptzStatus_signal(axis_camera::Axis);
+
+    void motorInfo_signal(drrobot_jaguarV2_player::MotorInfoArray msg);
 private:
 	int init_argc;
 	char** init_argv;
     //ros::Publisher chatter_publisher;
     QStringListModel logging_model;
 
+    geometry_msgs::Twist velocityVector;
+
     ros::Subscriber subscriber_imu;
     ros::Subscriber subscriber_fix;
     ros::Subscriber subscriber_extendedfix;
     ros::Subscriber subscriber_scan;
     ros::Subscriber subscriber_ptzStatus;
+     
+    ros::Subscriber subscriber_motorSensorSub;
+    ros::Publisher velocityPublisher;
 
 
     image_transport::Subscriber subscriber_frontCamera;
@@ -131,6 +150,9 @@ private:
     void callback_frontCamera(const sensor_msgs::ImageConstPtr& msg);
     void callback_PTZCamera(const sensor_msgs::ImageConstPtr& msg);
     void callback_PTZStatus(axis_camera::Axis);
+
+    
+    void motorSensorCallback(const drrobot_jaguarV2_player::MotorInfoArray::ConstPtr& msg);
 
 };
 }  // namespace imu_gps
