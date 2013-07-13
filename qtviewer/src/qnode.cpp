@@ -25,7 +25,8 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 
-
+#include <time.h>
+#include <QDir>
 
 /*****************************************************************************
 ** Namespaces
@@ -74,39 +75,49 @@ bool QNode::init() {
     publisher_ptz_command = n.advertise<axis_camera::Axis>("/axis/cmd",1);
 
     subscriber_ptzStatus = n.subscribe("axis/state",1,&QNode::callback_PTZStatus,this);
+
+    for(int i = 0; i < QNode::STYPE_MAX; i++)
+    {
+        saveSingleSensorMessage[i] = false;
+        sensorLastSaveTime[i] = QTime(0,0,0);
+        sensorLogEnabled[i] = false;
+        sensorLogMinMessagePeriodInMSec[i] = 1000;
+    }
+
     start();
 
     return true;
 }
-
-/*
-void clbck(const imu_node::imuConstPtr& scan)
+void QNode::setSensorLoggingDirPath(const char *dirPath)
 {
-   printf("acclx: %f\n",scan->accelx);
+    strncpy(sensorLogDirPath, dirPath, QNode::MAX_PATH_LEN);
 }
 
-struct arg
+void QNode::setAllSensorLogEnabled(bool value, int minMessagePeriodInMSec)
 {
-    int init_argc;
-    char** init_argv;
-};
-void* deneme(void *prm)
-{
-        arg* robot =  (arg*)prm;
+    for(int i = 0; i < QNode::STYPE_MAX; i++)
+    {
+        sensorLogEnabled[i] = value;
+        sensorLogMinMessagePeriodInMSec[i] = minMessagePeriodInMSec;
+        sensorLastSaveTime[i] = QTime(0,0,0);
+    }
+}
 
-        ros::init(robot->init_argc, robot->init_argv, "goget_it_laser_subscriber");
-        {
-                ros::NodeHandle nodeHandle;
-                ros::Subscriber subscriber;
-                subscriber = nodeHandle.subscribe<imu_node::imu>("/imu", 1000,clbck);
-                ros::AsyncSpinner spinner(4);
-                spinner.start();
-                ros::waitForShutdown();
-        }
-        return NULL;
-}*/
+void QNode::setAllSensorSaveSingleMessage()
+{
+    for(int i = 0; i < QNode::STYPE_MAX; i++)
+    {
+        saveSingleSensorMessage[i] = true;
+        sensorLastSaveTime[i] = QTime(0,0,0);
+    }
+}
+
 void QNode::callback_frontCamera(const sensor_msgs::ImageConstPtr& msg)
 {
+    //Logging
+    //sensor_msgs::Image image = *msg;
+    //sensorMessageWriteToFile((u_int8_t*)&image, sizeof(sensor_msgs::Image),STYPE_FRONT_CAMERA,"FRONTCAMERA");
+
     //cv_bridge::CvImagePtr cv_ptr;
     cv::Mat cv_ptr;
     try
@@ -126,10 +137,19 @@ void QNode::callback_frontCamera(const sensor_msgs::ImageConstPtr& msg)
 
     Q_EMIT frontCamera_signal(cpy);
 
+    QImage* qimage =new QImage(cpy.data,cpy.cols,cpy.rows,cpy.step,QImage::Format_RGB888);
+    if(qimage != NULL)
+    {
+       imageWriteToFile(qimage, STYPE_FRONT_CAMERA,"FRONTCAMERA");
+       delete qimage;
+    }
 
 }
 void QNode::callback_PTZCamera(const sensor_msgs::ImageConstPtr& msg)
 {
+    //Logging
+    //sensor_msgs::Image image = *msg;
+    //sensorMessageWriteToFile((u_int8_t*)&image, sizeof(sensor_msgs::Image),STYPE_PTZ_CAMERA,"PTZCAMERA");
 
     cv::Mat cv_ptr;
     try
@@ -149,12 +169,228 @@ void QNode::callback_PTZCamera(const sensor_msgs::ImageConstPtr& msg)
 
     Q_EMIT ptzCamera_signal(cpy);
 
+    QImage* qimage = new QImage(cpy.data,cpy.cols,cpy.rows,cpy.step,QImage::Format_RGB888);
+    if(qimage != NULL)
+    {
+       imageWriteToFile(qimage, STYPE_PTZ_CAMERA,"PTZCAMERA");
 
+       delete qimage;
+    }
 }
 void QNode::callback_PTZStatus(axis_camera::Axis msg)
 {
+    sensorMessageWriteToFile((u_int8_t*)&msg, sizeof(axis_camera::Axis),STYPE_PTZ_STATUS,"PTZSTATUS");
+
     Q_EMIT ptzStatus_signal(msg);
 
+}
+bool QNode::imageWriteToFile(QImage* qimage, int stype, char *sensorName)
+{
+    if(stype >= QNode::STYPE_MAX)
+    {
+        return false;
+    }
+
+    if(!sensorLogEnabled[stype] && !saveSingleSensorMessage[stype])
+    {
+        return false;
+    }
+
+    QDir dir(sensorLogDirPath);
+
+    if(!dir.exists())
+    {
+        dir.mkdir(sensorLogDirPath);
+    }
+
+    if(!dir.exists())
+    {
+        return false;
+    }
+
+    QTime currtime = QTime::currentTime();
+
+    QString subDir;
+    QDate currDate = QDate::currentDate();
+
+    char cstr[100];
+
+    sprintf(cstr, "%0.4d%0.2d%0.2d",currDate.year(),currDate.month(), currDate.day() );
+
+    if(sensorLogDirPath[strlen(sensorLogDirPath)-1] == '/')
+        subDir =  (QString)sensorLogDirPath + (QString)cstr;//QString::number(currDate.year()) +QString::number(currDate.month()) + QString::number(currDate.day());
+    else
+        subDir =  (QString)sensorLogDirPath + "/" + (QString)cstr;//+ QString::number(currDate.year()) +QString::number(currDate.month()) + QString::number(currDate.day());
+
+    dir = QDir(subDir);
+    if(!dir.exists())
+    {
+        dir.mkdir(subDir);
+    }
+
+    if(!dir.exists())
+    {
+        return false;
+    }
+
+    subDir = subDir + "/" + sensorName;
+
+    dir = QDir(subDir);
+    if(!dir.exists())
+    {
+        dir.mkdir(subDir);
+    }
+
+    if(!dir.exists())
+    {
+        return false;
+    }
+
+    sprintf(cstr, "%0.2d%0.2d%0.2d.png",currtime.hour(),currtime.minute(),currtime.second());
+
+    QString filePath = subDir + "/" + (QString)cstr;
+ /*   QFile file(filePath);
+
+    if(file.exists())
+        file.open(QIODevice::Append);
+    else
+    {
+       file.open(QIODevice::WriteOnly);
+    }
+
+    if(!file.isOpen())
+        return false;
+*/
+    if(sensorLogEnabled[stype])
+    {
+        if(sensorLastSaveTime[stype].msecsTo(currtime) >= sensorLogMinMessagePeriodInMSec[stype])
+        {
+           //logging
+           //logging end!
+           sensorLastSaveTime[stype] = currtime;
+        }
+    }
+    else if(saveSingleSensorMessage[stype])
+    {
+       //logging
+        //file.write((char*)&currtime, sizeof(QTime));
+        //file.write((char*)&rawMessageLen, sizeof(rawMessageLen));
+        //file.write((char*)rawMessage, rawMessageLen);
+        qimage->save(filePath);
+       //logging end
+
+       sensorLastSaveTime[stype] = currtime;
+
+       saveSingleSensorMessage[stype] = false;
+    }
+    return true;
+}
+
+bool QNode::sensorMessageWriteToFile(u_int8_t *rawMessage, u_int32_t rawMessageLen, int stype, char *sensorName)
+{
+    if(stype >= QNode::STYPE_MAX)
+    {
+        return false;
+    }
+
+    if(!sensorLogEnabled[stype] && !saveSingleSensorMessage[stype])
+    {
+        return false;
+    }
+    if(rawMessageLen == 0 || rawMessage == NULL)
+    {
+        return false;
+    }
+    QDir dir(sensorLogDirPath);
+
+    if(!dir.exists())
+    {
+        dir.mkdir(sensorLogDirPath);
+    }
+
+    if(!dir.exists())
+    {
+        return false;
+    }
+
+    QTime currtime = QTime::currentTime();
+
+    QString subDir;
+    QDate currDate = QDate::currentDate();
+
+    char cstr[100];
+
+    sprintf(cstr, "%0.4d%0.2d%0.2d",currDate.year(),currDate.month(), currDate.day() );
+
+    if(sensorLogDirPath[strlen(sensorLogDirPath)-1] == '/')
+        subDir =  (QString)sensorLogDirPath + (QString)cstr;//QString::number(currDate.year()) +QString::number(currDate.month()) + QString::number(currDate.day());
+    else
+        subDir =  (QString)sensorLogDirPath + "/" + (QString)cstr;//+ QString::number(currDate.year()) +QString::number(currDate.month()) + QString::number(currDate.day());
+
+    dir = QDir(subDir);
+    if(!dir.exists())
+    {
+        dir.mkdir(subDir);
+    }
+
+    if(!dir.exists())
+    {
+        return false;
+    }
+
+    subDir = subDir + "/" + sensorName;
+
+    dir = QDir(subDir);
+    if(!dir.exists())
+    {
+        dir.mkdir(subDir);
+    }
+
+    if(!dir.exists())
+    {
+        return false;
+    }
+
+    sprintf(cstr, "H%0.2d.dat",currtime.hour());
+
+    QString filePath = subDir + "/" + (QString)cstr;
+    QFile file(filePath);
+
+    if(file.exists())
+        file.open(QIODevice::Append);
+    else
+    {
+       file.open(QIODevice::WriteOnly);
+    }
+
+    if(!file.isOpen())
+        return false;
+
+    if(sensorLogEnabled[stype])
+    {
+        if(sensorLastSaveTime[stype].msecsTo(currtime) >= sensorLogMinMessagePeriodInMSec[stype])
+        {
+           //logging
+           file.write((char*)&currtime, sizeof(QTime));
+           file.write((char*)&rawMessageLen, sizeof(rawMessageLen));
+           file.write((char*)rawMessage, rawMessageLen);
+           //logging end!
+           sensorLastSaveTime[stype] = currtime;
+        }
+    }
+    else if(saveSingleSensorMessage[stype])
+    {
+       //logging
+        file.write((char*)&currtime, sizeof(QTime));
+        file.write((char*)&rawMessageLen, sizeof(rawMessageLen));
+        file.write((char*)rawMessage, rawMessageLen);
+       //logging end
+
+       sensorLastSaveTime[stype] = currtime;
+
+       saveSingleSensorMessage[stype] = false;
+    }
+    return true;
 }
 
 void QNode::callback_imu(const imu_node::imuConstPtr &imu){
@@ -165,6 +401,10 @@ void QNode::callback_imu(const imu_node::imuConstPtr &imu){
     QString str;
     if(imu->yaw == 0.0)
         return;
+
+    imu_node::imu imumsg = *imu;
+    sensorMessageWriteToFile((u_int8_t*)&imumsg, sizeof(imu_node::imu),STYPE_IMU,"IMU");
+
     sprintf(cstr,"%f",imu->accelx);
     Q_EMIT imuSignal_accelX(cstr);
 
@@ -208,6 +448,8 @@ void QNode::callback_gpsfix(const gps_node::GPSFixConstPtr &fix)
 {
     //if(fix->status.status == -1)
     //{
+    gps_node::GPSFix msg = *fix;
+    sensorMessageWriteToFile((u_int8_t*)&msg, sizeof(gps_node::GPSFix),STYPE_GPS,"GPS");
 
     Q_EMIT gpsSignal_quality(fix->gga6GPSQualityStatus.c_str());
     Q_EMIT gpsSignal_latitude((fix->rmc3Latitude + fix->rmc4LatNorS).c_str());
@@ -228,6 +470,10 @@ void QNode::callback_nawsatfix(const sensor_msgs::NavSatFixConstPtr &fix)
 
 void QNode::callback_scan(const sensor_msgs::LaserScanConstPtr& scan)
 {
+  sensor_msgs::LaserScan msg = *scan;
+
+  sensorMessageWriteToFile((u_int8_t*)&msg, sizeof(sensor_msgs::LaserScan),STYPE_LASER,"LASER");
+
   Q_EMIT scanSignal(*scan);
   //  Q_EMIT gpsSignal_raw("SCAN");
 }
@@ -293,4 +539,4 @@ void QNode::log( const LogLevel &level, const std::string &msg) {
     logging_model.setData(logging_model.index(logging_model.rowCount()-1),new_row);
     Q_EMIT loggingUpdated(); // used to readjust the scrollbar
 }
-}
+}/*end of namespace imu_gps*/

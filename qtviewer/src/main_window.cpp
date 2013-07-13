@@ -29,6 +29,8 @@
 #include <sys/types.h>
 #include <math.h>
 #include <axis_camera/Axis.h>
+#include <QDir>
+
 /*****************************************************************************
 ** Namespaces
 *****************************************************************************/
@@ -296,8 +298,6 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent)
     ////////////////////////////////////////////////////////////////////////
     qsrand(QTime(0,0,0).secsTo(QTime::currentTime()));
 
-
-
     scene.setSceneRect(-1600,-1600, 3200, 3200);
     scene.setItemIndexMethod(QGraphicsScene::NoIndex);
 
@@ -335,9 +335,13 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent)
     QObject::connect(ui.spinBox_ArcDistanceInMeter,SIGNAL(	valueChanged (int)),this,SLOT(setArcDistanceInMeter(int)));
     QObject::connect(ui.spinBox_arcDistanceInPixels,SIGNAL(	valueChanged (int)),this,SLOT(setArcDistanceInPixels(int)));
     QObject::connect(ui.spinBox_LaserRange,SIGNAL(	valueChanged (int)),this,SLOT(setRange(int)));
-
     //timer.start(1000 / 33);
 
+     ui.line_log_dir_path->setText( QDir::currentPath());
+
+     QObject::connect(ui.button_single_save,SIGNAL(clicked()),this,SLOT(button_single_save_clicked()));
+
+     QObject::connect(ui.checkbox_enable_sensor_logging,SIGNAL(stateChanged(int)),this,SLOT(checkbox_enable_sensor_logging_changed(int)));
 }
 void MainWindow::setRange(int deg){ scanview->setRange(deg); Q_EMIT sceneUpdate();}
 void MainWindow::setArcDistanceInMeter(int deg){ scanview->setArcDistanceInMeter(deg);Q_EMIT sceneUpdate();}
@@ -359,6 +363,17 @@ void MainWindow::showNoMasterMessage() {
 	msgBox.exec();
     close();
 }
+void MainWindow::button_single_save_clicked()
+{
+    qnode.setSensorLoggingDirPath( ui.line_log_dir_path->text().toStdString().c_str());
+    qnode.setAllSensorSaveSingleMessage();
+}
+void MainWindow::checkbox_enable_sensor_logging_changed(int state)
+{
+    QString interArrivalTime =  ui.line_edit_log_period->text();
+    qnode.setAllSensorLogEnabled(ui.checkbox_remember_settings->isChecked(), interArrivalTime.toInt());
+}
+
 void MainWindow::button_PTZPan_clicked()
 {
     axis_camera::Axis cmd;

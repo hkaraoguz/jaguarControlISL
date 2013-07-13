@@ -35,8 +35,12 @@
 #include <compressed_image_transport/compressed_subscriber.h>
 #include <compressed_image_transport/compression_common.h>
 #include <opencv2/opencv.hpp>
+#include <time.h>
 
 #include <axis_camera/Axis.h>
+
+#include <QGraphicsItem>
+#include <QtGui>
 
 
 /*****************************************************************************
@@ -68,7 +72,6 @@ public:
 	         Error,
 	         Fatal
 	 };
-
 	QStringListModel* loggingModel() { return &logging_model; }
 	void log( const LogLevel &level, const std::string &msg);
 
@@ -132,6 +135,43 @@ private:
     void callback_PTZCamera(const sensor_msgs::ImageConstPtr& msg);
     void callback_PTZStatus(axis_camera::Axis);
 
+//Logging
+public:
+    static const int MAX_PATH_LEN=260;
+private:
+    enum {
+        STYPE_LASER,
+        STYPE_GPS,
+        STYPE_IMU,
+        STYPE_PTZ_CAMERA,
+        STYPE_FRONT_CAMERA,
+        STYPE_PTZ_STATUS,
+        STYPE_MAX
+    }SensorType;
+
+    char sensorLogDirPath[QNode::MAX_PATH_LEN];
+    bool sensorLogEnabled[QNode::STYPE_MAX];
+    int  sensorLogMinMessagePeriodInMSec[QNode::STYPE_MAX];
+    bool saveSingleSensorMessage[QNode::STYPE_MAX];
+    QTime sensorLastSaveTime[QNode::STYPE_MAX];
+
+
+public:
+    bool sensorMessageWriteToFile(u_int8_t *rawMessage, u_int32_t rawMessageLen, int stype, char *sensorName);
+    bool imageWriteToFile(QImage* qimage, int stype, char *sensorName);
+    void setSensorLoggingDirPath(const char *dirPath);
+    void setAllSensorLogEnabled(bool value, int minMessagePeriodInMSec);
+    void setAllSensorSaveSingleMessage();
+};
+
+class Logger
+{
+public:
+    static const int  MAX_PATH_LEN = 260;
+    static char mainDirPath[MAX_PATH_LEN];
+    static char fileName[MAX_PATH_LEN];
+
+    void saveScan(unsigned char *data, int dlen);
 };
 }  // namespace imu_gps
 #endif /* imu_gps_QNODE_HPP_ */

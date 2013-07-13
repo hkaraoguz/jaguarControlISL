@@ -204,6 +204,10 @@ public Q_SLOTS:
     void getPTZCameraStatus(axis_camera::Axis);
     void button_PTZPan_clicked();
     void button_PTZTilt_clicked();
+
+    //logging!
+    void button_single_save_clicked();
+    void checkbox_enable_sensor_logging_changed(int state);
 Q_SIGNALS:
     void sceneUpdate();
 
