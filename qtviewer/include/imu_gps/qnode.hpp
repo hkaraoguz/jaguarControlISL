@@ -41,7 +41,7 @@
 
 #include <QGraphicsItem>
 #include <QtGui>
-
+#include <rosbag/bag.h>
 
 #include <drrobot_jaguarV2_player/MotorInfo.h>
 #include <drrobot_jaguarV2_player/MotorInfoArray.h>
@@ -170,6 +170,7 @@ private:
         STYPE_PTZ_CAMERA,
         STYPE_FRONT_CAMERA,
         STYPE_PTZ_STATUS,
+        STYPE_DRROBOT_PLAYER,
         STYPE_MAX
     }SensorType;
 
@@ -181,6 +182,10 @@ private:
 
 
 public:
+    template<class T>
+    bool bagwrite(std::string const& topic, T const& msg, const char *fileName, rosbag::bagmode::BagMode mode);
+    template<class T>
+    bool logSensorMessage(std::string const& topic,  T const& msg, int stype);
     bool sensorMessageWriteToFile(u_int8_t *rawMessage, u_int32_t rawMessageLen, int stype, char *sensorName);
     bool imageWriteToFile(QImage* qimage, int stype, char *sensorName);
     void setSensorLoggingDirPath(const char *dirPath);
