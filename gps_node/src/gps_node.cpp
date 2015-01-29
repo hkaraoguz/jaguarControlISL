@@ -665,8 +665,10 @@ void decode_gps_data(GPSFix *fix, char *data, int dlen)
 int main(int argc, char ** argv) {
   ros::init(argc, argv, "gpsd_client");
 
-  GPSDClient2 client;
-
+  //GPSDClient2 client;
+  
+  GPSDClient client;
+  
   if (!client.start())
   {
     printf("client start failed!");

@@ -35,9 +35,10 @@
 #include <drrobot_jaguarV2_player/CustomSensor.h>
 #include <std_msgs/Header.h>
 
-
+#include <rosbag/bag.h>
 #include <time.h>
 #include <QDir>
+#include <rosbag/bag.h>
 
 
 /*****************************************************************************
@@ -49,6 +50,138 @@ namespace imu_gps {
 /*****************************************************************************
 ** Implementation
 *****************************************************************************/
+
+template<class T>
+bool QNode::bagwrite(std::string const& topic, T const& msg, const char *fileName, rosbag::bagmode::BagMode mode)
+{
+    rosbag::Bag bag;
+    try {
+        //bag_.open(write_filename_, bagmode::Write);
+        bag.open(fileName, mode);
+    }
+    catch (rosbag::BagException e) {
+        LogLevel err = QNode::Warn;
+        std::string str = e.what();
+        log(err, str);
+        return false;
+    }
+
+    //ROS_INFO("Recording to %s.", target_filename_.c_str());
+
+    bag.write(topic, ros::Time::now(), msg);
+
+    bag.close();
+
+    LogLevel err = QNode::Debug;
+    std::string str = topic + " mesajı " + fileName + " dosyasına eklendi!";
+    log(err, str);
+
+    return true;
+}
+
+template<class T>
+bool QNode::logSensorMessage(std::string const& topic, T const& msg, int stype)
+{
+    if(stype >= QNode::STYPE_MAX)
+    {
+        return false;
+    }
+
+    if(!sensorLogEnabled[stype] && !saveSingleSensorMessage[stype])
+    {
+        return false;
+    }
+
+    QDir dir(sensorLogDirPath);
+
+    if(!dir.exists())
+    {
+        dir.mkdir(sensorLogDirPath);
+    }
+
+    if(!dir.exists())
+    {
+        return false;
+    }
+
+    QTime currtime = QTime::currentTime();
+
+    QString subDir;
+    QDate currDate = QDate::currentDate();
+
+    char cstr[100];
+
+    sprintf(cstr, "%0.4d%0.2d%0.2d",currDate.year(),currDate.month(), currDate.day() );
+
+    if(sensorLogDirPath[strlen(sensorLogDirPath)-1] == '/')
+        subDir =  (QString)sensorLogDirPath + (QString)cstr;//QString::number(currDate.year()) +QString::number(currDate.month()) + QString::number(currDate.day());
+    else
+        subDir =  (QString)sensorLogDirPath + "/" + (QString)cstr;//+ QString::number(currDate.year()) +QString::number(currDate.month()) + QString::number(currDate.day());
+
+    dir = QDir(subDir);
+    if(!dir.exists())
+    {
+        dir.mkdir(subDir);
+    }
+
+    if(!dir.exists())
+    {
+        return false;
+    }
+
+    subDir = subDir + "/" + topic.c_str();
+
+    dir = QDir(subDir);
+    if(!dir.exists())
+    {
+        dir.mkdir(subDir);
+    }
+
+    if(!dir.exists())
+    {
+        return false;
+    }
+
+    sprintf(cstr, "H%0.2d.dat",currtime.hour());
+
+    QString filePath = subDir + "/" + (QString)cstr;
+    QFile file(filePath);
+
+     rosbag::bagmode::BagMode mode;
+    if(file.exists())
+    {
+        mode = rosbag::bagmode::Append;
+        //file.open(QIODevice::Append);
+    }
+    else
+    {
+       mode = rosbag::bagmode::Write;
+       //file.open(QIODevice::WriteOnly);
+    }
+
+    //if(!file.isOpen())
+    //    return false;
+
+    //file.close();
+
+    if(sensorLogEnabled[stype])
+    {
+        if(sensorLastSaveTime[stype].msecsTo(currtime) >= sensorLogMinMessagePeriodInMSec[stype])
+        {
+
+             bagwrite(topic, msg, filePath.toStdString().c_str(),mode);
+             sensorLastSaveTime[stype] = currtime;
+        }
+    }
+    else if(saveSingleSensorMessage[stype])
+    {
+        bagwrite(topic, msg, filePath.toStdString().c_str(),mode);
+        sensorLastSaveTime[stype] = currtime;
+        saveSingleSensorMessage[stype] = false;
+    }
+    return true;
+}
+
 
 QNode::QNode(int argc, char** argv ) :
     init_argc(argc),
@@ -173,6 +306,9 @@ void QNode::callback_frontCamera(const sensor_msgs::ImageConstPtr& msg)
     
 void QNode::motorSensorCallback(const drrobot_jaguarV2_player::MotorInfoArray::ConstPtr& msg)
     {
+         logSensorMessage("drrobot_player1/drrobot_motor", *msg, STYPE_DRROBOT_PLAYER );
+
+
         int msgSize = msg->motorInfos.capacity();
         
         if (msgSize == 6)
@@ -214,7 +350,7 @@ void QNode::callback_PTZCamera(const sensor_msgs::ImageConstPtr& msg)
     cv::Mat cv_ptr;
     try
     {
-         cv_ptr = cv_bridge::toCvShare(msg, "bgr8")->image;
+        cv_ptr = cv_bridge::toCvShare(msg, "bgr8")->image;
     }
     catch (cv_bridge::Exception& e)
     {
@@ -436,6 +572,8 @@ bool QNode::sensorMessageWriteToFile(u_int8_t *rawMessage, u_int32_t rawMessageL
            file.write((char*)rawMessage, rawMessageLen);
            //logging end!
            sensorLastSaveTime[stype] = currtime;
+
+           file.close();
         }
     }
     else if(saveSingleSensorMessage[stype])
@@ -449,6 +587,8 @@ bool QNode::sensorMessageWriteToFile(u_int8_t *rawMessage, u_int32_t rawMessageL
        sensorLastSaveTime[stype] = currtime;
 
        saveSingleSensorMessage[stype] = false;
+
+       file.close();
     }
     return true;
 }
@@ -462,8 +602,10 @@ void QNode::callback_imu(const imu_node::imuConstPtr &imu){
     if(imu->yaw == 0.0)
         return;
 
-    imu_node::imu imumsg = *imu;
-    sensorMessageWriteToFile((u_int8_t*)&imumsg, sizeof(imu_node::imu),STYPE_IMU,"IMU");
+    //imu_node::imu imumsg = *imu;
+    //sensorMessageWriteToFile((u_int8_t*)&imumsg, sizeof(imu_node::imu),STYPE_IMU,"IMU");
+
+    logSensorMessage("imu", *imu, STYPE_IMU );
 
     sprintf(cstr,"%f",imu->accelx);
     Q_EMIT imuSignal_accelX(cstr);
@@ -508,8 +650,7 @@ void QNode::callback_gpsfix(const gps_node::GPSFixConstPtr &fix)
 {
     //if(fix->status.status == -1)
     //{
-    gps_node::GPSFix msg = *fix;
-    sensorMessageWriteToFile((u_int8_t*)&msg, sizeof(gps_node::GPSFix),STYPE_GPS,"GPS");
+    logSensorMessage("fix", *fix, STYPE_GPS );
 
     Q_EMIT gpsSignal_quality(fix->gga6GPSQualityStatus.c_str());
     Q_EMIT gpsSignal_latitude((fix->rmc3Latitude + fix->rmc4LatNorS).c_str());
@@ -530,11 +671,11 @@ void QNode::callback_nawsatfix(const sensor_msgs::NavSatFixConstPtr &fix)
 
 void QNode::callback_scan(const sensor_msgs::LaserScanConstPtr& scan)
 {
-  sensor_msgs::LaserScan msg = *scan;
 
-  sensorMessageWriteToFile((u_int8_t*)&msg, sizeof(sensor_msgs::LaserScan),STYPE_LASER,"LASER");
+  logSensorMessage("scan", *scan, STYPE_LASER );
 
   Q_EMIT scanSignal(*scan);
+
   //  Q_EMIT gpsSignal_raw("SCAN");
 }
 
@@ -574,12 +715,9 @@ void QNode::run() {
 
 		loop.sleep();
 
-	}
+    }
 
-    
-    
-
- velocityVector.linear.x = 0;
+    velocityVector.linear.x = 0;
     this->sendVelocityCommand(0,0,0);
 
    // ros::AsyncSpinner spinner_(4);
