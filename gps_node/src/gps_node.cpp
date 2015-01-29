@@ -52,7 +52,7 @@ class GPSDClient {
       privnode.getParam("use_gps_time", use_gps_time);
       privnode.getParam("check_fix_by_variance", check_fix_by_variance);
 
-      std::string host = "192.168.0.61";
+      std::string host = "192.168.0.71";
       int port = 10002;
       //privnode.getParam("host", host);
       //privnode.getParam("port", port);
@@ -273,10 +273,12 @@ class GPSDClient2 {
       privnode.getParam("use_gps_time", use_gps_time);
       privnode.getParam("check_fix_by_variance", check_fix_by_variance);
 
-      std::string host = "192.168.0.61";
+      std::string host = "192.168.0.71";
       int port = 10002;
-      //privnode.getParam("host", host);
-      //privnode.getParam("port", port);
+      privnode.getParam("host", host);
+      privnode.getParam("port", port);
+
+      printf("%s %d",host.c_str(),port);
 
       char port_s[12];
       snprintf(port_s, 12, "%d", port);
@@ -518,7 +520,7 @@ void decode_gps_data(GPSFix *fix, char *data, int dlen)
         int  curPos= 0;
         int  tlen;
         int  s32_Index = 0;
-        printf("\n");
+      //  printf("\n");
         while(s32_Index < 100 && curPos < dlen)
         {
           tlen = tokenize(',',resToken[s32_Index],100,data,dlen,curPos);
@@ -528,7 +530,7 @@ void decode_gps_data(GPSFix *fix, char *data, int dlen)
           curPos += tlen + 1;
           s32_Index++;
         }
-        printf("\n");
+    //    printf("\n");
         if (strcmp( resToken[0],"$GPRMC")== 0)
         {
           fix->rmc1UTCTime = resToken[0];
@@ -654,7 +656,7 @@ void decode_gps_data(GPSFix *fix, char *data, int dlen)
           fix->lastRawData = data;
           gps_fix_pub.publish(*fix);
         }
-        printf("rmc = %d, gga = %d , gsa = %d, gsv = %d, vtg = %d, rmt = %d\n",rmc, gga, gsa, gsv, vtg, rmt);
+      //  printf("rmc = %d, gga = %d , gsa = %d, gsv = %d, vtg = %d, rmt = %d\n",rmc, gga, gsa, gsv, vtg, rmt);
 
 }
 };

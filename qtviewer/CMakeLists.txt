@@ -32,7 +32,7 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 # rosbuild_include(qt_build qt-ros) 
 rosbuild_find_ros_package(qt_build)
 include(${qt_build_PACKAGE_PATH}/qt-ros.cmake)
-include_directories(/home/hakan/ros_workspace/jaguar2_laser_gps_imu/qtcreator-build)
+#include_directories(/home/hakan/ros_workspace/jaguar2_laser_gps_imu/qtcreator-build)
 
 find_package(OpenCV)
 include_directories(${OpenCV_INCLUDE_DIRS})

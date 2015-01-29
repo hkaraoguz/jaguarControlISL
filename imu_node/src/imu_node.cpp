@@ -45,8 +45,9 @@ class IMUClient {
 
       std::string host = "192.168.0.61";
       int port = 10001;
-      //privnode.getParam("host", host);
-      //privnode.getParam("port", port);
+      privnode.getParam("host", host);
+      privnode.getParam("port", port);
+      printf("IMU %s %d \n",host.c_str(),port);
 
       //--------------------------------------
       soc_imu = open(&tcpclient_imu,host.c_str(),port);
@@ -106,7 +107,7 @@ class IMUClient {
 
         if(tlen <= 0)
          break;
-        printf("token[%d]: %s\n",s32_Index,resToken[s32_Index]);
+       // printf("token[%d]: %s\n",s32_Index,resToken[s32_Index]);
 
         curPos += tlen + 1;
         s32_Index++;
@@ -187,7 +188,7 @@ Dr. Robot Inc.*/
         delay_ms(20);
          */
         imu_pub.publish(imu_);
-        printf("published!\n");
+       // printf("published!\n");
       }
 
 
@@ -197,7 +198,7 @@ Dr. Robot Inc.*/
       int rsize = tcpclient_readline(&tcpclient_imu,buffer,100,1000);
       if(rsize > 0)
       {
-        for(int i = 0; i < rsize; i++)
+      /*  for(int i = 0; i < rsize; i++)
         {
           if(buffer[i] == '\n')
             printf("\\n");
@@ -205,8 +206,8 @@ Dr. Robot Inc.*/
                       printf("\\r");
           else
             printf("%c",buffer[i]);
-        }
-        printf("\n");
+        }*/
+        //printf("\n");
         processIMUData(buffer, rsize);
       }
     }
